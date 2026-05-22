@@ -72,8 +72,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ id.meta.outputs.tags }}
-          labels: ${{ id.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           # Builds natively for both Standard Intel/AMD (x86_64) and ARM (e.g., Apple Silicon, Raspberry Pi, AWS Graviton)
           platforms: linux/amd64,linux/arm64
           # Utilize GitHub Actions cache to speed up subsequent builds significantly
