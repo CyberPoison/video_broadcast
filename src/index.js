@@ -15,6 +15,7 @@ if (!url) {
 
 // Track active child processes
 const processes = {};
+let isStreamActive = false;
 
 /**
  * Clean, colored terminal logging
@@ -59,13 +60,45 @@ async function start() {
   }
 
   // 1. Initialize local RTMP Server
+  let nms;
   try {
     const { startRtmpServer } = require('./rtmp-server');
-    startRtmpServer();
+    nms = startRtmpServer();
   } catch (err) {
     log('[Orchestrator]', '\x1b[31m', `Failed to start local RTMP server: ${err.message}`);
     process.exit(1);
   }
+
+  // Listen to RTMP server publish events to reactively spawn/kill stream clients
+  nms.on('postPublish', (id, streamPath, args) => {
+    if (streamPath === '/live/webpage') {
+      isStreamActive = true;
+      log('[Orchestrator]', '\x1b[32m', 'RTMP Stream is active. Spawning stream clients...');
+      
+      if (process.env.DISCORD_TOKEN && !processes.discord) {
+        spawnDiscordBot();
+      }
+      if (process.env.TELEGRAM_RTMP_URL && !processes.telegram) {
+        spawnTelegramStreamer();
+      }
+    }
+  });
+
+  nms.on('donePublish', (id, streamPath, args) => {
+    if (streamPath === '/live/webpage') {
+      isStreamActive = false;
+      log('[Orchestrator]', '\x1b[33m', 'RTMP Stream stopped. Terminating stream clients...');
+      
+      if (processes.discord) {
+        processes.discord.kill('SIGKILL');
+        processes.discord = null;
+      }
+      if (processes.telegram) {
+        processes.telegram.kill('SIGKILL');
+        processes.telegram = null;
+      }
+    }
+  });
 
   // Set the DISPLAY variable so all X11 processes connect to our virtual display
   process.env.DISPLAY = ':99';
@@ -115,22 +148,7 @@ async function start() {
   // 5. Start the FFmpeg screen capture recorder
   startFFmpegRecorder();
 
-  // Give the RTMP stream 3 seconds to establish stability before spawning bots
-  await new Promise((resolve) => setTimeout(resolve, 3000));
-
-  // 6. Spawn Discord Bot if credentials are provided
-  if (process.env.DISCORD_TOKEN) {
-    spawnDiscordBot();
-  } else {
-    log('[Orchestrator]', '\x1b[33m', 'DISCORD_TOKEN not set. Discord broadcast is disabled.');
-  }
-
-  // 7. Spawn Telegram Forwarder if ingest URL is provided
-  if (process.env.TELEGRAM_RTMP_URL) {
-    spawnTelegramStreamer();
-  } else {
-    log('[Orchestrator]', '\x1b[33m', 'TELEGRAM_RTMP_URL not set. Telegram broadcast is disabled.');
-  }
+  log('[Orchestrator]', '\x1b[35m', 'Supervisor active. Awaiting RTMP publish event to spawn stream bots...');
 }
 
 /**
@@ -225,8 +243,15 @@ function spawnDiscordBot() {
   });
 
   processes.discord.on('close', (code) => {
-    log('[Discord Bot Manager]', '\x1b[31m', `Discord process ended (code ${code}). Re-spawning in 5 seconds...`);
-    setTimeout(spawnDiscordBot, 5000);
+    if (processes.discord) {
+      log('[Discord Bot Manager]', '\x1b[31m', `Discord process ended (code ${code}). Re-spawning in 5 seconds...`);
+      processes.discord = null;
+      setTimeout(() => {
+        if (isStreamActive && process.env.DISCORD_TOKEN && !processes.discord) {
+          spawnDiscordBot();
+        }
+      }, 5000);
+    }
   });
 }
 
@@ -246,8 +271,15 @@ function spawnTelegramStreamer() {
   });
 
   processes.telegram.on('close', (code) => {
-    log('[Telegram Manager]', '\x1b[31m', `Telegram process ended (code ${code}). Re-spawning in 5 seconds...`);
-    setTimeout(spawnTelegramStreamer, 5000);
+    if (processes.telegram) {
+      log('[Telegram Manager]', '\x1b[31m', `Telegram process ended (code ${code}). Re-spawning in 5 seconds...`);
+      processes.telegram = null;
+      setTimeout(() => {
+        if (isStreamActive && process.env.TELEGRAM_RTMP_URL && !processes.telegram) {
+          spawnTelegramStreamer();
+        }
+      }, 5000);
+    }
   });
 }
 
