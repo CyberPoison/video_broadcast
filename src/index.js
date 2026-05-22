@@ -65,10 +65,11 @@ async function start() {
     '--exit-idle-time=-1',
     '--use-pid-file=no',
     '--system=false',
-    '--allow-run-as-root',
     '--log-level=warning',
     '--load=module-null-sink sink_name=virtual_speaker sink_properties=device.description=Virtual_Speaker'
-  ]);
+  ], {
+    env: { ...process.env, PULSE_ALLOW_RUN_AS_ROOT: '1' }
+  });
   
   processes.pulseaudio.stderr.on('data', (data) => {
     const msg = data.toString().trim();
