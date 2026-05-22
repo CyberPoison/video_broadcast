@@ -46,6 +46,18 @@ const chromiumBinary = fs.existsSync('/usr/bin/chromium-browser') ? 'chromium-br
 async function start() {
   log('[Orchestrator]', '\x1b[35m', 'Initializing Headless Webpage Streamer environment...');
   
+  // Ensure D-Bus system daemon is running
+  log('[Orchestrator]', '\x1b[35m', 'Starting D-Bus system daemon...');
+  try {
+    const { execSync } = require('child_process');
+    fs.mkdirSync('/var/run/dbus', { recursive: true });
+    execSync('dbus-uuidgen --ensure');
+    execSync('dbus-daemon --system --fork');
+    log('[Orchestrator]', '\x1b[32m', 'D-Bus system daemon started successfully.');
+  } catch (err) {
+    log('[Orchestrator]', '\x1b[31m', `D-Bus startup warning/error: ${err.message}`);
+  }
+
   // 1. Initialize local RTMP Server
   try {
     const { startRtmpServer } = require('./rtmp-server');
@@ -66,6 +78,7 @@ async function start() {
     '--use-pid-file=no',
     '--system=false',
     '--log-level=warning',
+    '--load=module-native-protocol-unix socket=/tmp/pulse-socket auth-anonymous=1',
     '--load=module-null-sink sink_name=virtual_speaker sink_properties=device.description=Virtual_Speaker'
   ], {
     env: { ...process.env, PULSE_ALLOW_RUN_AS_ROOT: '1' }
@@ -140,7 +153,7 @@ function launchChromium() {
     `--user-data-dir=/tmp/chrome-profile-${Date.now()}`,
     url
   ], {
-    env: { ...process.env, DISPLAY: ':99', PULSE_SINK: 'virtual_speaker' }
+    env: { ...process.env, DISPLAY: ':99', PULSE_SERVER: 'unix:/tmp/pulse-socket', PULSE_SINK: 'virtual_speaker' }
   });
 
   processes.chromium.on('close', (code) => {
@@ -173,7 +186,9 @@ function startFFmpegRecorder() {
     '-ar', '44100',
     '-f', 'flv',
     'rtmp://127.0.0.1/live/webpage'
-  ]);
+  ], {
+    env: { ...process.env, PULSE_SERVER: 'unix:/tmp/pulse-socket' }
+  });
 
   processes.ffmpeg.stderr.on('data', (data) => {
     const msg = data.toString().trim();

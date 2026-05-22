@@ -100,6 +100,28 @@ Duplicate `.env.example` to `.env` and configure the following parameters:
     docker compose down
     ```
 
+### Alternative: Quick Start with Docker Run
+
+If you prefer to run the pre-built image directly from the GitHub Container Registry (GHCR) using a single command instead of Docker Compose, execute the following `docker run` command:
+
+```bash
+docker run -d \
+  --name webpage_streamer \
+  --restart unless-stopped \
+  --shm-size 2g \
+  -e STREAM_URL="webstie URL" \
+  -e TELEGRAM_RTMP_URL="rtmps://dc5-1.rtmp.t.me/s/12345678:ABCDE..." \
+  -e DISCORD_TOKEN="YOUR_DISCORD_USER_TOKEN" \
+  -e DISCORD_GUILD_ID="YOUR_DISCORD_GUILD_ID" \
+  -e DISCORD_CHANNEL_ID="YOUR_DISCORD_CHANNEL_ID" \
+  -e WIDTH=1280 \
+  -e HEIGHT=720 \
+  -e FPS=30 \
+  ghcr.io/cyberpoison/video_broadcast:main
+```
+
+*(Note: Simply omit the `TELEGRAM_RTMP_URL` or `DISCORD_TOKEN` variables if you are only streaming to one of the platforms.)*
+
 ---
 
 ## 📖 Practical Guides
