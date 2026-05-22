@@ -8,10 +8,10 @@
     "start": "node src/index.js"
   },
   "dependencies": {
-    "@dank074/discord-video-stream": "^2.3.0",
-    "discord.js-selfbot-v13": "^13.13.0",
-    "dotenv": "^16.4.5",
-    "node-media-server": "^2.6.2"
+    "@dank074/discord-video-stream": "^6.0.0",
+    "discord.js-selfbot-v13": "^3.7.1",
+    "dotenv": "^17.4.2",
+    "node-media-server": "^4.2.4"
   },
   "engines": {
     "node": ">=20.0.0"
