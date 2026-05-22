@@ -208,10 +208,12 @@ function startFFmpegRecorder() {
   log('[FFmpeg Recorder]', '\x1b[32m', `Recording display :99.0 (${width}x${height} @ ${fps}fps)...`);
   
   processes.ffmpeg = spawn('ffmpeg', [
+    '-thread_queue_size', '1024',
     '-f', 'x11grab',
     '-video_size', `${width}x${height}`,
     '-framerate', `${fps}`,
     '-i', ':99.0',
+    '-thread_queue_size', '1024',
     '-f', 'pulse',
     '-i', 'virtual_speaker.monitor', // Capture from our virtual sound monitor
     '-c:v', 'libx264',
@@ -221,6 +223,7 @@ function startFFmpegRecorder() {
     '-c:a', 'aac',
     '-ac', '2',
     '-ar', '44100',
+    '-af', 'aresample=async=1', // Guarantee monotonic and continuous audio timestamps
     '-f', 'flv',
     'rtmp://127.0.0.1/live/webpage'
   ], {

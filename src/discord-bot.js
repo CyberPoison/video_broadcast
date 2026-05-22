@@ -3,6 +3,44 @@ global.WebSocket = require('ws');
 // Mock Deno environment to bypass ZeroMQ (azmq) filter which is unsupported in standard system FFmpeg
 global.Deno = {};
 
+// Monkeypatch debug-level for both CommonJS and ESM to print full error objects/stack traces instead of empty {}
+function patchDebugLevel(debugLevel, moduleType) {
+  if (!debugLevel || !debugLevel.Log || !debugLevel.Log.prototype) return;
+  
+  const originalLog = debugLevel.Log.prototype._log;
+  debugLevel.Log.prototype._log = function (level, fmt, args) {
+    if (fmt && typeof fmt === 'object' && fmt.error) {
+      console.error(`[debug-level Intercepted Error Stack (${moduleType})]:`, fmt.error);
+    }
+    return originalLog.apply(this, arguments);
+  };
+  
+  const originalLogDebugLike = debugLevel.Log.prototype._logDebugLike;
+  if (originalLogDebugLike) {
+    debugLevel.Log.prototype._logDebugLike = function (level, fmt, args) {
+      if (fmt && typeof fmt === 'object' && fmt.error) {
+        console.error(`[debug-level Intercepted Error Stack (${moduleType})]:`, fmt.error);
+      }
+      return originalLogDebugLike.apply(this, arguments);
+    };
+  }
+}
+
+// Patch CommonJS version
+try {
+  const debugLevelCJS = require('debug-level');
+  patchDebugLevel(debugLevelCJS, 'CJS');
+} catch (err) {
+  console.error('Failed to monkeypatch CJS debug-level:', err.message);
+}
+
+// Patch ESM version asynchronously to intercept modules imported by @dank074/discord-video-stream
+import('debug-level').then((debugLevelESM) => {
+  patchDebugLevel(debugLevelESM, 'ESM');
+}).catch((err) => {
+  console.error('Failed to monkeypatch ESM debug-level:', err.message);
+});
+
 const { Client } = require('discord.js-selfbot-v13');
 const { Streamer, prepareStream, playStream } = require('@dank074/discord-video-stream');
 require('dotenv').config();
@@ -46,7 +84,8 @@ client.on('ready', async () => {
       fps,
       bitrateVideo: 3000,
       bitrateVideoMax: 4500,
-      includeAudio: true
+      includeAudio: true,
+      customInputOptions: ['-fflags', '+genpts']
     });
     
     // Log FFmpeg events transparently to ease debugging and diagnostic visibility
