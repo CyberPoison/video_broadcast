@@ -52,6 +52,19 @@ async function start() {
   try {
     const { execSync } = require('child_process');
     fs.mkdirSync('/var/run/dbus', { recursive: true });
+    
+    // Clean up D-Bus lock/pid files to prevent startup failure on container restart
+    for (const pidFile of ['/var/run/dbus/pid', '/run/dbus/pid']) {
+      if (fs.existsSync(pidFile)) {
+        try {
+          fs.unlinkSync(pidFile);
+          log('[Orchestrator]', '\x1b[33m', `Removed stale D-Bus pid file: ${pidFile}`);
+        } catch (unlinkErr) {
+          log('[Orchestrator]', '\x1b[31m', `Failed to remove stale pid file ${pidFile}: ${unlinkErr.message}`);
+        }
+      }
+    }
+
     execSync('dbus-uuidgen --ensure');
     execSync('dbus-daemon --system --fork');
     log('[Orchestrator]', '\x1b[32m', 'D-Bus system daemon started successfully.');
@@ -65,9 +78,11 @@ async function start() {
     const { startRtmpServer } = require('./rtmp-server');
     nms = startRtmpServer(
       // onPublish callback
-      (id, streamPath, args) => {
-        log('[Orchestrator Debug]', '\x1b[36m', `RTMP postPublish event: id=${id} streamPath=${streamPath}`);
-        if (streamPath === '/live/webpage' || streamPath === 'live/webpage' || streamPath.endsWith('/live/webpage')) {
+      (session, streamPath, args) => {
+        const resolvedPath = (typeof session === 'object' && session ? session.streamPath : streamPath) || '';
+        const resolvedId = (typeof session === 'object' && session ? session.id : session) || 'unknown';
+        log('[Orchestrator Debug]', '\x1b[36m', `RTMP postPublish event: id=${resolvedId} streamPath=${resolvedPath}`);
+        if (resolvedPath === '/live/webpage' || resolvedPath === 'live/webpage' || resolvedPath.endsWith('/live/webpage')) {
           isStreamActive = true;
           log('[Orchestrator]', '\x1b[32m', 'RTMP Stream is active. Spawning stream clients...');
           
@@ -80,9 +95,11 @@ async function start() {
         }
       },
       // onDonePublish callback
-      (id, streamPath, args) => {
-        log('[Orchestrator Debug]', '\x1b[36m', `RTMP donePublish event: id=${id} streamPath=${streamPath}`);
-        if (streamPath === '/live/webpage' || streamPath === 'live/webpage' || streamPath.endsWith('/live/webpage')) {
+      (session, streamPath, args) => {
+        const resolvedPath = (typeof session === 'object' && session ? session.streamPath : streamPath) || '';
+        const resolvedId = (typeof session === 'object' && session ? session.id : session) || 'unknown';
+        log('[Orchestrator Debug]', '\x1b[36m', `RTMP donePublish event: id=${resolvedId} streamPath=${resolvedPath}`);
+        if (resolvedPath === '/live/webpage' || resolvedPath === 'live/webpage' || resolvedPath.endsWith('/live/webpage')) {
           isStreamActive = false;
           log('[Orchestrator]', '\x1b[33m', 'RTMP Stream stopped. Terminating stream clients...');
           
