@@ -4,7 +4,7 @@ const NodeMediaServer = require('node-media-server');
  * Starts the local RTMP server on port 1935.
  * This server receives the high-quality stream from FFmpeg and serves it to Discord and Telegram.
  */
-function startRtmpServer() {
+function startRtmpServer(onPublish, onDonePublish) {
   const config = {
     rtmp: {
       port: 1935,
@@ -19,6 +19,13 @@ function startRtmpServer() {
   };
 
   const nms = new NodeMediaServer(config);
+  
+  if (onPublish) {
+    nms.on('postPublish', onPublish);
+  }
+  if (onDonePublish) {
+    nms.on('donePublish', onDonePublish);
+  }
   
   nms.run();
   

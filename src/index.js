@@ -63,42 +63,44 @@ async function start() {
   let nms;
   try {
     const { startRtmpServer } = require('./rtmp-server');
-    nms = startRtmpServer();
+    nms = startRtmpServer(
+      // onPublish callback
+      (id, streamPath, args) => {
+        log('[Orchestrator Debug]', '\x1b[36m', `RTMP postPublish event: id=${id} streamPath=${streamPath}`);
+        if (streamPath === '/live/webpage' || streamPath === 'live/webpage' || streamPath.endsWith('/live/webpage')) {
+          isStreamActive = true;
+          log('[Orchestrator]', '\x1b[32m', 'RTMP Stream is active. Spawning stream clients...');
+          
+          if (process.env.DISCORD_TOKEN && !processes.discord) {
+            spawnDiscordBot();
+          }
+          if (process.env.TELEGRAM_RTMP_URL && !processes.telegram) {
+            spawnTelegramStreamer();
+          }
+        }
+      },
+      // onDonePublish callback
+      (id, streamPath, args) => {
+        log('[Orchestrator Debug]', '\x1b[36m', `RTMP donePublish event: id=${id} streamPath=${streamPath}`);
+        if (streamPath === '/live/webpage' || streamPath === 'live/webpage' || streamPath.endsWith('/live/webpage')) {
+          isStreamActive = false;
+          log('[Orchestrator]', '\x1b[33m', 'RTMP Stream stopped. Terminating stream clients...');
+          
+          if (processes.discord) {
+            processes.discord.kill('SIGKILL');
+            processes.discord = null;
+          }
+          if (processes.telegram) {
+            processes.telegram.kill('SIGKILL');
+            processes.telegram = null;
+          }
+        }
+      }
+    );
   } catch (err) {
     log('[Orchestrator]', '\x1b[31m', `Failed to start local RTMP server: ${err.message}`);
     process.exit(1);
   }
-
-  // Listen to RTMP server publish events to reactively spawn/kill stream clients
-  nms.on('postPublish', (id, streamPath, args) => {
-    if (streamPath === '/live/webpage') {
-      isStreamActive = true;
-      log('[Orchestrator]', '\x1b[32m', 'RTMP Stream is active. Spawning stream clients...');
-      
-      if (process.env.DISCORD_TOKEN && !processes.discord) {
-        spawnDiscordBot();
-      }
-      if (process.env.TELEGRAM_RTMP_URL && !processes.telegram) {
-        spawnTelegramStreamer();
-      }
-    }
-  });
-
-  nms.on('donePublish', (id, streamPath, args) => {
-    if (streamPath === '/live/webpage') {
-      isStreamActive = false;
-      log('[Orchestrator]', '\x1b[33m', 'RTMP Stream stopped. Terminating stream clients...');
-      
-      if (processes.discord) {
-        processes.discord.kill('SIGKILL');
-        processes.discord = null;
-      }
-      if (processes.telegram) {
-        processes.telegram.kill('SIGKILL');
-        processes.telegram = null;
-      }
-    }
-  });
 
   // Set the DISPLAY variable so all X11 processes connect to our virtual display
   process.env.DISPLAY = ':99';
