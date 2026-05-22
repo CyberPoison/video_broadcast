@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  streamer:
+    build: .
+    container_name: webpage_streamer
+    restart: unless-stopped
+    # Chromium makes heavy use of shared memory (/dev/shm). The default Docker shared memory
+    # limit is 64mb, which can cause Chromium to crash on media-heavy pages.
+    # We increase this limit to 2gb to ensure rock-solid stability.
+    shm_size: '2gb'
+    env_file:
+      - .env

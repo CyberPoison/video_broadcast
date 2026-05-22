@@ -1,0 +1,20 @@
+{
+  "name": "headless-webpage-streamer",
+  "version": "1.0.0",
+  "description": "Stream any webpage headlessly to Discord or Telegram",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@dank074/discord-video-stream": "^2.3.0",
+    "discord.js-selfbot-v13": "^13.13.0",
+    "dotenv": "^16.4.5",
+    "node-media-server": "^2.6.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "private": true
+}
