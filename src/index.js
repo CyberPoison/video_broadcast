@@ -58,7 +58,7 @@ async function start() {
   // Set the DISPLAY variable so all X11 processes connect to our virtual display
   process.env.DISPLAY = ':99';
   
-  // 2. Start PulseAudio Virtual Sound Driver
+  // 2. Start PulseAudio Virtual Sound Driver with Virtual Null Sink
   log('[PulseAudio]', '\x1b[34m', 'Starting PulseAudio virtual sound server...');
   processes.pulseaudio = spawn('pulseaudio', [
     '--daemonize=no',
@@ -66,7 +66,8 @@ async function start() {
     '--use-pid-file=no',
     '--system=false',
     '--allow-run-as-root',
-    '--log-level=warning'
+    '--log-level=warning',
+    '--load=module-null-sink sink_name=virtual_speaker sink_properties=device.description=Virtual_Speaker'
   ]);
   
   processes.pulseaudio.stderr.on('data', (data) => {
@@ -138,7 +139,7 @@ function launchChromium() {
     `--user-data-dir=/tmp/chrome-profile-${Date.now()}`,
     url
   ], {
-    env: { ...process.env, DISPLAY: ':99' }
+    env: { ...process.env, DISPLAY: ':99', PULSE_SINK: 'virtual_speaker' }
   });
 
   processes.chromium.on('close', (code) => {
@@ -146,6 +147,8 @@ function launchChromium() {
     setTimeout(launchChromium, 2000);
   });
 }
+
+let ffmpegLogs = [];
 
 /**
  * Capture virtual screen and virtual audio using FFmpeg and pipe to local RTMP server
@@ -159,7 +162,7 @@ function startFFmpegRecorder() {
     '-framerate', `${fps}`,
     '-i', ':99.0',
     '-f', 'pulse',
-    '-i', 'default',
+    '-i', 'virtual_speaker.monitor', // Capture from our virtual sound monitor
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-tune', 'zerolatency',
@@ -172,12 +175,20 @@ function startFFmpegRecorder() {
   ]);
 
   processes.ffmpeg.stderr.on('data', (data) => {
-    // If you need verbose FFmpeg logs, uncomment the log line below:
-    // log('[FFmpeg Output]', '\x1b[32m', data.toString().trim());
+    const msg = data.toString().trim();
+    if (msg) {
+      ffmpegLogs.push(msg);
+      if (ffmpegLogs.length > 15) ffmpegLogs.shift();
+    }
   });
 
   processes.ffmpeg.on('close', (code) => {
-    log('[FFmpeg Recorder]', '\x1b[31m', `FFmpeg recorder exited with code ${code}. Restarting recorder in 3 seconds...`);
+    log('[FFmpeg Recorder]', '\x1b[31m', `FFmpeg recorder exited with code ${code}.`);
+    if (code !== 0 && ffmpegLogs.length > 0) {
+      log('[FFmpeg Recorder Errors]', '\x1b[31m', '\n' + ffmpegLogs.join('\n'));
+    }
+    ffmpegLogs = []; // Reset logs list
+    log('[FFmpeg Recorder]', '\x1b[31m', `Restarting recorder in 3 seconds...`);
     setTimeout(startFFmpegRecorder, 3000);
   });
 }
