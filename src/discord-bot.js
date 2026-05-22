@@ -1,5 +1,7 @@
 // Expose global WebSocket for compatibility with @dank074/discord-video-stream in Node.js
 global.WebSocket = require('ws');
+// Mock Deno environment to bypass ZeroMQ (azmq) filter which is unsupported in standard system FFmpeg
+global.Deno = {};
 
 const { Client } = require('discord.js-selfbot-v13');
 const { Streamer, prepareStream, playStream } = require('@dank074/discord-video-stream');
@@ -45,6 +47,14 @@ client.on('ready', async () => {
       bitrateVideo: 3000,
       bitrateVideoMax: 4500,
       includeAudio: true
+    });
+    
+    // Log FFmpeg events transparently to ease debugging and diagnostic visibility
+    command.on('stderr', (line) => {
+      console.log(`[Discord Bot FFmpeg] ${line}`);
+    });
+    command.on('error', (err) => {
+      console.error(`[Discord Bot FFmpeg Error] ${err.message}`);
     });
     
     console.log('\x1b[36m%s\x1b[0m', `[Discord Bot] Starting Go Live screen sharing...`);
