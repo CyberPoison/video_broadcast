@@ -1,3 +1,15 @@
+// Polyfill Promise.withResolvers for older Node.js environments (v20)
+if (!Promise.withResolvers) {
+  Promise.withResolvers = function () {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+}
+
 // Expose global WebSocket for compatibility with @dank074/discord-video-stream in Node.js
 global.WebSocket = require('ws');
 // Mock Deno environment to bypass ZeroMQ (azmq) filter which is unsupported in standard system FFmpeg
