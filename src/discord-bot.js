@@ -1,3 +1,6 @@
+// Expose global WebSocket for compatibility with @dank074/discord-video-stream in Node.js
+global.WebSocket = require('ws');
+
 const { Client } = require('discord.js-selfbot-v13');
 const { Streamer, prepareStream, playStream } = require('@dank074/discord-video-stream');
 require('dotenv').config();
